@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Topo Archify — Editor Topologi</title>
+<style>
+:root{
+  --bg:#070b1a; --panel:#0b1226; --panel2:#0e1630;
+  --line:rgba(255,255,255,.09); --txt:#e8ecf5; --mut:#8b94ad;
+  --cyan:#22d3ee; --green:#34d399; --violet:#a78bfa;
+  --rose:#fb7185; --amber:#fbbf24; --orange:#fb923c;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Plus Jakarta Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#cv{width:100%;height:100%;display:block;touch-action:none;shape-rendering:geometricPrecision}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(600px 400px at 85% -5%,rgba(43,78,255,.12),transparent)}
+/* SB Admin 2 light theme */
+body.light{--bg:#eef1f6;--panel:#f4f6fa;--panel2:#f4f6fa;--line:#d8dce6;--txt:#5a5c69;--mut:#858796;--cyan:#4e73df;background:#eef1f6}
+body.light header,body.light #palette,body.light footer{background:#f4f6fa!important}
+body.light #stage{background:#eef1f6}
+body.light #insp{background:#f4f6fa}
+body.light .docname{background:#e9edf3;color:#5a5c69}
+body.light .f input,body.light .f select{background:#e9edf3;color:#5a5c69;border-color:#d1d3e2}
+header{display:flex;align-items:center;gap:14px;padding:9px 18px;border-bottom:1px solid var(--line);background:#0b1226;z-index:10}
+.logo{font-family:var(--mono);font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap}
+.logo b{color:var(--cyan)}
+.docname{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+.docname:hover{border-color:var(--cyan)}
+.docname .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.docname small{color:var(--mut)}
+.hbtns{margin-left:auto;display:flex;gap:6px;align-items:center}
+.ibtn{width:32px;height:32px;display:grid;place-items:center;font-size:15px;padding:0;border-radius:8px}
+.ibtn:disabled{opacity:.3;cursor:default}
+.ibtn:disabled:hover{border-color:var(--line)}
+.ibtn.on{border-color:var(--cyan);color:var(--cyan)}
+.divider{width:1px;height:22px;background:var(--line);margin:0 4px}
+button{font-family:var(--mono);font-size:12px;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+button:hover{border-color:var(--cyan)}
+button:active{transform:scale(.96)}
+button.primary{background:linear-gradient(135deg,#0075ff,#00e0ff);border:none;font-weight:700;padding:8px 16px}
+button.ghost{background:transparent}
+.menuwrap{position:relative}
+.menu{position:absolute;right:0;top:38px;background:#0e1630;border:1px solid var(--line);border-radius:12px;padding:5px;min-width:190px;box-shadow:0 12px 40px rgba(0,0,0,.55);display:none;z-index:50}
+.menu.open{display:block}
+.menu button{display:block;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:7px}
+.menu button:hover{background:rgba(34,211,238,.12)}
+.menu .mlabel{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--mut);text-transform:uppercase;padding:7px 12px 3px}
+button.primary{background:linear-gradient(135deg,#0075ff,#00e0ff);border:none;font-weight:700}
+button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* layout */
+#main{flex:1;display:flex;min-height:0}
+/* palette */
+  #palette{width:196px;border-right:1px solid var(--line);background:#0b1226;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+#palette h3{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase}
+.phint{font-size:11px;color:var(--mut);margin:-4px 0 8px}
+.shape{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:grab;font-size:13px;transition:transform .15s,border-color .15s,background .15s}
+.shape:hover{border-color:var(--cyan);transform:translateY(-1px);background:#14204a}
+.shape:active{cursor:grabbing;transform:scale(.98)}
+.shape small{display:block;font-size:10px;color:var(--mut);font-weight:400}
+.shape .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+.widebtn{width:100%;text-align:left;padding:10px 12px;border-radius:12px}
+/* canvas */
+  #stage{flex:1;position:relative;overflow:hidden;background:#070b1a}
+#cv{width:100%;height:100%;display:block;touch-action:none}
+#cv.grabbing{cursor:grabbing}
+/* inspector */
+#insp{width:240px;border-left:1px solid var(--line);background:rgba(11,18,38,.85);padding:14px;overflow:auto}
+#insp h3{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin-bottom:10px}
+.f{margin-bottom:10px}
+.f label{display:block;font-family:var(--mono);font-size:11px;color:var(--mut);margin-bottom:4px}
+.f input,.f select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px;font-family:var(--mono);font-size:12px}
+.f input:focus,.f select:focus{outline:2px solid var(--cyan);border-color:transparent}
+.empty{color:var(--mut);font-size:13px;line-height:1.6}
+/* legend */
+#legend{position:absolute;left:12px;bottom:12px;display:flex;gap:10px;background:rgba(11,18,38,.85);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--mut)}
+#legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}
+/* statusbar */
+footer{display:flex;gap:16px;padding:7px 16px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--mut);background:rgba(11,18,38,.9)}
+footer b{color:var(--green)}
+/* node styles in svg */
+.node{cursor:grab}
+.node rect.body{fill:#101a36;stroke-width:1.5}
+.node text{font-family:var(--mono);pointer-events:none}
+.node .t{fill:#e8ecf5;font-size:12px;font-weight:700}
+.node .s{fill:#8b94ad;font-size:10px}
+.node.sel rect.body{stroke:var(--cyan)!important;stroke-dasharray:6 3}
+.edge{stroke-width:2.2;fill:none;stroke-linecap:round}
+.edge.flow{stroke-dasharray:10 8;animation:flow .7s linear infinite}
+.edge-glow{stroke-width:6;fill:none;stroke-linecap:round;opacity:.18;pointer-events:none}
+@keyframes flow{to{stroke-dashoffset:-18}}
+.node{cursor:grab;will-change:transform;transition:filter .15s}
+.node:hover{filter:brightness(1.25)}
+.node rect.body{fill:url(#nodeGrad);stroke-width:1.5;filter:drop-shadow(0 6px 18px rgba(0,0,0,.55))}
+.node rect.hi{fill:none;stroke:rgba(255,255,255,.22);stroke-width:1;pointer-events:none}
+.node text{font-family:var(--mono);pointer-events:none}
+.flowdot{pointer-events:none;filter:drop-shadow(0 0 5px currentColor)}
+/* area / zone */
+.area{cursor:grab}
+.area rect.box{fill:rgba(34,211,238,.05);stroke-width:1.5;stroke-dasharray:10 6}
+.area text.h{font-family:var(--mono);font-weight:800;fill:#e8ecf5;pointer-events:none;paint-order:stroke;stroke:rgba(7,11,26,.85);stroke-width:4px}
+body.light .area text.h{fill:#4e73df;stroke:rgba(255,255,255,.9)}
+body.light .area rect.box{fill:rgba(78,115,223,.06)}
+.area .rz{fill:#0b1226;stroke:var(--cyan);stroke-width:2;cursor:nwse-resize}
+.area.sel rect.box{stroke:var(--cyan)}
+@media(prefers-reduced-motion:reduce){.edge.flow{animation:none}.flowdot{display:none}}
+.edge-lbl{font-family:var(--mono);font-size:10px;fill:#8b94ad}
+.port{fill:#0b1226;stroke:#8b94ad;stroke-width:1.5;cursor:crosshair}
+.port:hover{fill:var(--cyan)}
+/* zoombar */
+#zoombar{position:absolute;right:12px;bottom:12px;display:flex;gap:6px;align-items:center;background:rgba(11,18,38,.9);border:1px solid var(--line);border-radius:10px;padding:5px 8px;font-family:var(--mono);font-size:11px;color:var(--mut)}
+#zoombar button{padding:5px 10px}
+#zLbl{min-width:44px;text-align:center}
+@media(max-width:900px){#palette{display:none}#insp{width:200px}}
+/* dropdown klik kanan */
+#ctxmenu{position:fixed;z-index:99;display:none;background:#0e1630;border:1px solid var(--line);border-radius:10px;padding:5px;min-width:150px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#ctxmenu button{display:block;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:7px}
+#ctxmenu button:hover{background:rgba(34,211,238,.15)}
+#ctxmenu button.danger:hover{background:rgba(251,113,133,.15);color:#fb7185}
+.armed{outline:2px dashed var(--cyan);outline-offset:3px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">◈ TOPO<b>ARCHIFY</b></div>
+  <div class="docname" id="docname" title="Klik untuk rename"><span class="dot"></span><span id="docTitle">Topologi Baru</span><small>· tersimpan otomatis</small></div>
+  <div class="hbtns">
+    <button class="primary" id="bLayout">✨ Auto layout</button>
+    <div class="divider"></div>
+    <button class="ibtn ghost" id="bUndo" disabled title="Undo (Ctrl+Z)">↩</button>
+    <button class="ibtn ghost" id="bRedo" disabled title="Redo (Ctrl+Y)">↪</button>
+    <button class="ibtn ghost" id="zFit" title="Fit ke layar">⤢</button>
+    <button class="ibtn ghost on" id="bFlow" title="Animasi aliran data">〜</button>
+    <button class="ibtn ghost" id="bTheme" title="Mode terang/gelap">☀</button>
+    <div class="divider"></div>
+    <div class="menuwrap">
+      <button class="ghost" id="bMore">⋯ Menu</button>
+      <div class="menu" id="menu">
+        <div class="mlabel">Tambah</div>
+        <button id="bArea">▦ Area baru</button>
+        <button id="bMany">＋ 50 node contoh</button>
+        <div class="mlabel">File</div>
+        <button id="bJson">↓ Export JSON</button>
+        <button id="bSvg">↓ Export SVG</button>
+        <button id="bPng">↓ Export PNG</button>
+        <button id="bClear" style="color:var(--rose)">✕ Hapus semua</button>
+      </div>
+    </div>
+  </div>
+</header>
+<div id="main">
+  <aside id="palette">
+    <h3>Perangkat</h3>
+    <p class="phint">Klik / drag ke kanvas</p>
+    <div id="shapes"></div>
+    <h3 style="margin-top:12px">Lainnya</h3>
+    <button class="widebtn" id="bArea2">▦ Area / zone baru</button>
+    <h3 style="margin-top:12px">Cara nyambung</h3>
+    <p class="empty"><b>Klik kanan</b> node → <b>Link</b> → klik tujuan. Geser kanvas: klik kiri area kosong.</p>
+  </aside>
+  <div id="stage">
+    <svg id="cv" aria-label="Kanvas topologi"></svg>
+    <div id="zoombar">
+      <button id="zOut">−</button><span id="zLbl">100%</span><button id="zIn">+</button>
+      <button id="zFit">⤢ Fit</button>
+    </div>
+    <div id="ctxmenu">
+      <button id="ctxLink">🔗 Link…</button>
+      <button id="ctxDup">⧉ Duplikat</button>
+      <button id="ctxDel" class="danger">✕ Hapus</button>
+    </div>
+    <div id="legend">
+      <span><i style="background:#fbbf24"></i>internet</span>
+      <span><i style="background:#fb923c"></i>router</span>
+      <span><i style="background:#22d3ee"></i>switch</span>
+      <span><i style="background:#fb7185"></i>firewall</span>
+      <span><i style="background:#a78bfa"></i>olt/ont</span>
+    </div>
+  </div>
+  <aside id="insp">
+    <h3>Inspector</h3>
+    <div id="inspBody"><p class="empty">Klik node atau edge untuk edit label, tipe, dan warna. Tekan Delete untuk hapus yang dipilih.</p></div>
+  </aside>
+</div>
+<footer>
+  <span>nodes: <b id="stN">0</b></span>
+  <span>edges: <b id="stE">0</b></span>
+  <span id="stMsg">ready — drag shape dari kiri</span>
+</footer>
+<input type="file" id="fImport" accept=".json" hidden>
+<script>
+const ICONS={
+ internet:'<path d="M8,26 a6,6 0 0,1 1,-12 a8,8 0 0,1 15,-2 a7,7 0 0,1 2,14 Z"/>',
+ router:'<circle cx="15" cy="15" r="10"/><path d="M15,9 v4 M15,17 v4 M9,15 h4 M17,15 h4"/>',
+ switch:'<rect x="5" y="9" width="20" height="12" rx="2"/><path d="M8,15 h14 M19,12 l3,3 -3,3"/>',
+ firewall:'<rect x="6" y="6" width="18" height="18" rx="2"/><path d="M6,12 h18 M6,18 h18 M12,6 v6 M18,6 v6"/>',
+ accesspoint:'<circle cx="15" cy="22" r="2" fill="C"/><path d="M9,17 a9,9 0 0,1 12,0 M6,13 a14,14 0 0,1 18,0"/>',
+ ont:'<rect x="6" y="15" width="18" height="9" rx="2"/><path d="M10,15 v-5"/>',
+ olt:'<rect x="8" y="5" width="14" height="20" rx="2"/><path d="M8,11 h14 M8,17 h14"/>',
+ odp:'<rect x="8" y="5" width="14" height="20" rx="2"/><path d="M15,5 v20"/>',
+ otb:'<rect x="6" y="10" width="18" height="11" rx="2"/><path d="M6,15 h18 M15,15 v7"/>',
+  odc:'<rect x="7" y="4" width="16" height="22" rx="2"/>',
+ manhole:'<circle cx="15" cy="15" r="10"/><circle cx="15" cy="15" r="3.5"/>',
+ client:'<rect x="7" y="7" width="16" height="11" rx="2"/><path d="M15,18 v4 M11,24 h8"/>'};
+const TYPES={
+ internet:{label:"Internet",desc:"ISP, uplink",c:"#fbbf24",shape:"box"},
+ router:{label:"Router",desc:"Routing, gateway",c:"#fb923c",shape:"box"},
+ switch:{label:"Switch",desc:"Core, distribusi",c:"#22d3ee",shape:"box"},
+ firewall:{label:"Firewall",desc:"WAF, filter",c:"#fb7185",shape:"box"},
+ accesspoint:{label:"Access Point",desc:"WiFi, hotspot",c:"#34d399",shape:"box"},
+ ont:{label:"ONT / Modem",desc:"Pelanggan",c:"#a78bfa",shape:"box"},
+ olt:{label:"OLT",desc:"Optical line terminal",c:"#a78bfa",shape:"box"},
+ odp:{label:"ODP",desc:"Optical distribution",c:"#34d399",shape:"box"},
+ otb:{label:"OTB",desc:"Optical termination box",c:"#8b94ad",shape:"box"},
+ manhole:{label:"Manhole",desc:"Bak kontrol FO / splicing",c:"#8b94ad",shape:"box"},
+  odc:{label:"ODC",desc:"Optical distribution cabinet",c:"#34d399",shape:"box"},
+ client:{label:"Client",desc:"PC, laptop, HP",c:"#22d3ee",shape:"box"}};
+let nodes=[],edges=[],seq=1,sel=null;
+let areas=[],areaSeq=1;
+// undo/redo: snapshot JSON tiap aksi
+let undoStack=[],redoStack=[];
+function snap(){return JSON.stringify({nodes,edges,areas,seq,areaSeq});}
+function pushUndo(){undoStack.push(snap());if(undoStack.length>100)undoStack.shift();redoStack=[];updateUR();}
+function doUndo(){if(!undoStack.length)return;redoStack.push(snap());
+  const d=JSON.parse(undoStack.pop());nodes=d.nodes;edges=d.edges;areas=d.areas||[];seq=d.seq;areaSeq=d.areaSeq||1;syncIds();sel=null;pendingLink=null;render();updateUR();msg("undo ✓");}
+function doRedo(){if(!redoStack.length)return;undoStack.push(snap());
+  const d=JSON.parse(redoStack.pop());nodes=d.nodes;edges=d.edges;areas=d.areas||[];seq=d.seq;areaSeq=d.areaSeq||1;syncIds();sel=null;pendingLink=null;render();updateUR();msg("redo ✓");}
+function updateUR(){document.getElementById("bUndo").disabled=!undoStack.length;document.getElementById("bRedo").disabled=!redoStack.length;}
+const nodesById={};
+function syncIds(){for(const k in nodesById)delete nodesById[k];nodes.forEach(n=>nodesById[n.id]=n);}
+const cv=document.getElementById("cv"),NS="http://www.w3.org/2000/svg";
+const stageEl=document.getElementById("stage");
+// kamera: pan + zoom, viewBox dikontrol manual
+let cam={x:0,y:0,z:1};
+const W=()=>stageEl.clientWidth||800,H=()=>stageEl.clientHeight||600;
+function applyCam(){cv.setAttribute("viewBox",`${cam.x} ${cam.y} ${W()/cam.z} ${H()/cam.z}`);
+  document.getElementById("zLbl").textContent=Math.round(cam.z*100)+"%";}
+function fitView(pad=60){
+  if(!nodes.length){cam={x:0,y:0,z:1};applyCam();return;}
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  nodes.forEach(n=>{x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x+140);y1=Math.max(y1,n.y+56);});
+  const bw=(x1-x0)+pad*2,bh=(y1-y0)+pad*2;
+  const w=W(),h=H();
+  const tz=Math.min(w/Math.max(bw,1),h/Math.max(bh,1),2);
+  const tx=(x0+x1)/2-(w/tz)/2, ty=(y0+y1)/2-(h/tz)/2;
+  // animasi kamera 300ms biar smooth
+  const sx=cam.x,sy=cam.y,sz=cam.z,t0=performance.now();
+  cancelAnimationFrame(fitView._raf);
+  const anim=t=>{
+    const k=Math.min(1,(t-t0)/300),e=1-Math.pow(1-k,3);
+    cam.x=sx+(tx-sx)*e;cam.y=sy+(ty-sy)*e;cam.z=sz+(tz-sz)*e;
+    applyCam();
+    if(k<1)fitView._raf=requestAnimationFrame(anim);
+  };
+  fitView._raf=requestAnimationFrame(anim);}
+// palette
+const sh=document.getElementById("shapes");
+Object.entries(TYPES).forEach(([k,v])=>{
+  const d=document.createElement("div");d.className="shape";d.draggable=true;
+  const svg=`<svg width="18" height="18" viewBox="0 0 30 30" fill="none" stroke="${v.c}" stroke-width="2">${(ICONS[k]||"").replaceAll("C",v.c)}</svg>`;
+  d.innerHTML=`<span class="ic" style="background:${v.c}1f;border:1px solid ${v.c}55">${svg}</span><span>${v.label}<small>${v.desc}</small></span>`;
+  d.ondragstart=e=>e.dataTransfer.setData("text/plain",k);
+  sh.appendChild(d);
+});
+document.getElementById("bArea2").onclick=()=>document.getElementById("bArea").click();
+const stage=document.getElementById("stage");
+stage.ondragover=e=>e.preventDefault();
+stage.ondrop=e=>{e.preventDefault();const t=e.dataTransfer.getData("text/plain");if(!TYPES[t])return;
+  const r=cv.getBoundingClientRect();
+  const wx=cam.x+(e.clientX-r.left)/cam.z, wy=cam.y+(e.clientY-r.top)/cam.z;
+  addNode(t,wx-70,wy-28);};
+// pan: drag kanvas kosong pakai klik kiri + zoom: ctrl+scroll / tombol
+let panning=null;
+cv.addEventListener("pointerdown",e=>{
+  if(e.target!==cv||e.button!==0)return;
+  panning={sx:e.clientX,sy:e.clientY,ox:cam.x,oy:cam.y};
+  try{cv.setPointerCapture(e.pointerId);}catch{}
+});
+cv.addEventListener("contextmenu",e=>{if(e.target===cv)e.preventDefault();});
+cv.addEventListener("pointermove",e=>{
+  if(!panning)return;
+  cam.x=panning.ox-(e.clientX-panning.sx)/cam.z;
+  cam.y=panning.oy-(e.clientY-panning.sy)/cam.z;
+  applyCam();
+});
+cv.addEventListener("pointerup",()=>panning=null);
+cv.addEventListener("pointercancel",()=>panning=null);
+let wheelRaf=0,wheelTarget=1;
+cv.addEventListener("wheel",e=>{
+  e.preventDefault();
+  wheelTarget=Math.min(4,Math.max(.15,wheelTarget*(e.deltaY<0?1.15:1/1.15)));
+  if(wheelRaf)return;
+  const r=cv.getBoundingClientRect();
+  const cx=e.clientX-r.left,cy=e.clientY-r.top;
+  const tick=()=>{
+    wheelRaf=0;
+    const mx=cam.x+cx/cam.z, my=cam.y+cy/cam.z;
+    cam.z+=(wheelTarget-cam.z)*.25;
+    if(Math.abs(wheelTarget-cam.z)<.001)cam.z=wheelTarget;
+    else wheelRaf=requestAnimationFrame(tick);
+    cam.x=mx-cx/cam.z; cam.y=my-cy/cam.z;
+    applyCam();
+  };
+  wheelRaf=requestAnimationFrame(tick);
+},{passive:false});
+document.getElementById("zIn").onclick=()=>{cam.z=Math.min(3,cam.z*1.2);applyCam();};
+document.getElementById("zOut").onclick=()=>{cam.z=Math.max(.2,cam.z/1.2);applyCam();};
+document.querySelectorAll("#zFit").forEach(b=>b.onclick=()=>fitView());
+function addNode(type,x,y,label){
+  pushUndo();
+  const n={id:"n"+(seq++),type,x,y,label:label||TYPES[type].label+" "+(seq-1),sub:TYPES[type].label.toLowerCase()};
+  nodes.push(n);nodesById[n.id]=n;render();return n;}
+function addEdge(a,b,label){pushUndo();edges.push({id:"e"+Date.now()+Math.floor(Math.random()*99),a,b,label:label||""});render();}
+function delNode(id){pushUndo();nodes=nodes.filter(x=>x.id!==id);delete nodesById[id];edges=edges.filter(x=>x.a!==id&&x.b!==id);sel=null;render();}
+function resetAll(){pushUndo();nodes=[];edges=[];areas=[];for(const k in nodesById)delete nodesById[k];sel=null;pendingLink=null;render();}
+function loadData(d){pushUndo();nodes=d.nodes||[];edges=d.edges||[];areas=d.areas||[];syncIds();seq=nodes.length+1;areaSeq=(d.areaSeq||areas.length+1);fitView();}
+function el(tag,at){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);return e;}
+function nodeIcon(g,type,c){
+  // ikon standar topologi, digambar di kotak 30x30 posisi (10,13)
+  const X=10,Y=13;
+  const s=(t,at)=>{const e=el(t,at);g.appendChild(e);return e;};
+  if(type==="router"){ // lingkaran + 4 panah
+    s("circle",{cx:X+15,cy:Y+15,r:12,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+15},${Y+6} v6 M${X+15},${Y+18} v6 M${X+6},${Y+15} h6 M${X+18},${Y+15} h6`,stroke:c,"stroke-width":2,fill:"none"});
+    s("path",{d:`M${X+13},${Y+8} l2,-3 2,3 M${X+13},${Y+22} l2,3 2,-3 M${X+8},${Y+13} l-3,2 3,2 M${X+22},${Y+13} l3,2 -3,2`,stroke:c,"stroke-width":1.6,fill:"none"});
+  }else if(type==="switch"){ // kotak + panah bolak-balik
+    s("rect",{x:X+3,y:Y+8,width:24,height:14,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+7},${Y+15} h16 M${X+19},${Y+12} l4,3 -4,3 M${X+11},${Y+12} l-4,3 4,3`,stroke:c,"stroke-width":1.6,fill:"none"});
+  }else if(type==="firewall"){ // tembok bata
+    s("rect",{x:X+4,y:Y+6,width:22,height:18,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+4},${Y+12} h22 M${X+4},${Y+18} h22 M${X+11},${Y+6} v6 M${X+19},${Y+6} v6 M${X+15},${Y+12} v6 M${X+7},${Y+18} v6 M${X+23},${Y+18} v6`,stroke:c,"stroke-width":1.2});
+  }else if(type==="accesspoint"){ // titik + gelombang
+    s("circle",{cx:X+15,cy:Y+21,r:2.5,fill:c});
+    s("path",{d:`M${X+8},${Y+16} a10,10 0 0,1 14,0 M${X+5},${Y+12} a15,15 0 0,1 20,0`,stroke:c,"stroke-width":1.8,fill:"none"});
+  }else if(type==="internet"){ // awan
+    s("path",{d:`M${X+6},${Y+22} a6,6 0 0,1 1,-12 a8,8 0 0,1 15,-2 a7,7 0 0,1 2,14 Z`,fill:"none",stroke:c,"stroke-width":2});
+  }else if(type==="olt"){ // rack + slot
+    s("rect",{x:X+6,y:Y+5,width:18,height:20,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+6},${Y+11} h18 M${X+6},${Y+17} h18`,stroke:c,"stroke-width":1.4});
+    s("circle",{cx:X+10,cy:Y+8,r:1.2,fill:c});s("circle",{cx:X+10,cy:Y+14,r:1.2,fill:c});s("circle",{cx:X+10,cy:Y+20,r:1.2,fill:c});
+  }else if(type==="odp"){ // kotak + pintu splitter
+    s("rect",{x:X+7,y:Y+5,width:16,height:20,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+15},${Y+5} v20 M${X+7},${Y+12} h8`,stroke:c,"stroke-width":1.4});
+  }else if(type==="ont"){ // modem + antena sinyal
+    s("rect",{x:X+5,y:Y+14,width:20,height:10,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+9},${Y+14} v-5 M${X+9},${Y+6} l-2,2 M${X+9},${Y+6} l2,2`,stroke:c,"stroke-width":1.4,fill:"none"});
+    s("circle",{cx:X+20,cy:Y+19,r:1.4,fill:c});
+  }else if(type==="otb"){ // terminal box + kabel
+    s("rect",{x:X+5,y:Y+10,width:20,height:12,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+5},${Y+16} h20 M${X+15},${Y+16} v6`,stroke:c,"stroke-width":1.4});
+  }else if(type==="odc"){ // cabinet: kotak tinggi polos
+    s("rect",{x:X+8,y:Y+4,width:14,height:22,rx:2,fill:"none",stroke:c,"stroke-width":2});
+  }else if(type==="manhole"){ // tutup got: lingkaran + lubang
+    s("circle",{cx:X+15,cy:Y+15,r:11,fill:"none",stroke:c,"stroke-width":2});
+    s("circle",{cx:X+15,cy:Y+15,r:4,fill:"none",stroke:c,"stroke-width":1.6});
+    s("path",{d:`M${X+15},${Y+4} v3 M${X+15},${Y+23} v3 M${X+4},${Y+15} h3 M${X+23},${Y+15} h3`,stroke:c,"stroke-width":1.4});
+  }else if(type==="client"){ // monitor + stand
+    s("rect",{x:X+7,y:Y+7,width:16,height:11,rx:1.5,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+15},${Y+18} v4 M${X+11},${Y+24} h8`,stroke:c,"stroke-width":1.8});
+  }else{ // default: kotak + panah
+    s("rect",{x:X+6,y:Y+9,width:18,height:12,rx:2,fill:"none",stroke:c,"stroke-width":2});
+    s("path",{d:`M${X+10},${Y+15} h10 M${X+17},${Y+12} l3,3 -3,3`,stroke:c,"stroke-width":1.6,fill:"none"});
+  }
+}
+function render(){
+  applyCam();
+  cv.innerHTML="";
+  // defs: gradient body node + glow filter
+  const defs=el("defs",{});
+  defs.innerHTML=`<linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#182444"/><stop offset="1" stop-color="#0d1530"/></linearGradient>
+    <radialGradient id="dotGrad" cx=".35" cy=".3" r="1">
+    <stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="currentColor" stop-opacity=".9"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></radialGradient>`;
+  cv.appendChild(defs);
+  // edges (under)
+  // areas (paling bawah)
+  areas.forEach(a=>{
+    const g=el("g",{class:"area"+(sel&&sel.id===a.id?" sel":""),transform:`translate(${a.x},${a.y})`,"data-id":a.id});
+    g.appendChild(el("rect",{class:"box",width:a.w,height:a.h,rx:14,stroke:a.color||"#22d3ee"}));
+    const t=el("text",{class:"h",x:16,y:-10,"font-size":a.fs||13});t.textContent="▦ "+a.label.toUpperCase();g.appendChild(t);
+    const rz=el("rect",{class:"rz",x:a.w-9,y:a.h-9,width:18,height:18,rx:5});g.appendChild(rz);
+    rz.onpointerdown=ev=>{ev.stopPropagation();ev.preventDefault();startResize(ev,a);};
+    g.onpointerdown=ev=>{ev.stopPropagation();if(ev.button===0)startAreaDrag(ev,a,g);};
+    g.onclick=ev=>{ev.stopPropagation();select("area",a.id);};
+    cv.appendChild(g);
+  });
+  // kabel digambar ulang tiap drag selesai -> id path perlu stabil
+  function paintEdge(e){
+    const a=nodesById[e.a],b=nodesById[e.b];if(!a||!b)return;
+    const r=edgeD(a,b),col=TYPES[a.type].c;
+    const g0=el("path",{d:r.d,class:"edge-glow",stroke:col,"data-id":e.id+"-g"});
+    cv.appendChild(g0);
+    const p=el("path",{id:e.id,d:r.d,class:flowOn?"edge flow":"edge",stroke:col,"stroke-opacity":.9,"data-id":e.id});
+    p.style.cursor="pointer";
+    p.onclick=ev=>{ev.stopPropagation();select("edge",e.id);};
+    cv.appendChild(p);
+    if(e.label){const t=el("text",{x:r.mx,y:r.my,class:"edge-lbl","text-anchor":"middle","data-id":e.id});t.textContent=e.label;cv.appendChild(t);}
+    if(flowOn){
+      const dot=el("circle",{r:3.2,class:"flowdot",fill:"#fff",style:`color:${col}`});
+      const anim=document.createElementNS(NS,"animateMotion");
+      anim.setAttribute("dur",(1.2+((e.id.charCodeAt(2)||5)%10)/10)+"s");
+      anim.setAttribute("repeatCount","indefinite");
+      const mp=document.createElementNS(NS,"mpath");
+      mp.setAttribute("href","#"+e.id);
+      anim.appendChild(mp);dot.appendChild(anim);cv.appendChild(dot);
+    }
+  }
+  edges.forEach(paintEdge);
+  // nodes — semua kotak seragam
+  nodes.forEach(n=>{
+    const c=TYPES[n.type].c;
+    const g=el("g",{class:"node"+(sel&&sel.id===n.id?" sel":""),transform:`translate(${n.x},${n.y})`,"data-id":n.id});
+    g.appendChild(el("rect",{class:"body",width:140,height:56,rx:14,stroke:c,fill:"url(#nodeGrad)"}));
+    g.appendChild(el("rect",{class:"hi",x:3,y:3,width:134,height:22,rx:11}));
+    const ic=el("rect",{x:10,y:13,width:30,height:30,rx:7,fill:c+"22",stroke:c});g.appendChild(ic);
+    nodeIcon(g,n.type,c);
+    const it=el("text",{x:25,y:34,class:"s","text-anchor":"middle",fill:c});it.textContent=TYPES[n.type].icon;g.appendChild(it);
+    const t1=el("text",{x:48,y:26,class:"t"});t1.textContent=n.label.slice(0,16);g.appendChild(t1);
+    const t2=el("text",{x:48,y:41,class:"s"});t2.textContent=n.sub||"";g.appendChild(t2);
+    const dot=el("circle",{class:"port",cx:140,cy:28,r:6});g.appendChild(dot);
+    dot.style.display="none";
+    g.onpointerdown=ev=>{ev.stopPropagation();if(ev.button===0)startDrag(ev,n,g);};
+    g.oncontextmenu=ev=>{ev.preventDefault();ev.stopPropagation();openMenu(ev,n);};
+    g.onclick=ev=>{ev.stopPropagation();
+      if(pendingLink&&pendingLink!==n.id){/* ditangani di pointerup drag */}
+      else if(!pendingLink)select("node",n.id);};
+    cv.appendChild(g);
+  });
+  document.getElementById("stN").textContent=nodes.length;
+  document.getElementById("stE").textContent=edges.length;
+  renderInspector();
+}
+function msg(t){document.getElementById("stMsg").textContent=t;}
+// (select didefinisikan di blok klik-kanan di bawah)
+// klik kanan -> dropdown Link -> klik node tujuan
+let pendingLink=null;
+const ctxmenu=document.getElementById("ctxmenu");
+let ctxNode=null;
+function openMenu(ev,n){
+  ctxNode=n;select("node",n.id);
+  ctxmenu.style.display="block";
+  ctxmenu.style.left=Math.min(ev.clientX,innerWidth-170)+"px";
+  ctxmenu.style.top=Math.min(ev.clientY,innerHeight-140)+"px";
+}
+document.addEventListener("click",()=>ctxmenu.style.display="none");
+cv.addEventListener("contextmenu",e=>{if(e.target===cv)e.preventDefault();});
+document.getElementById("ctxLink").onclick=e=>{e.stopPropagation();ctxmenu.style.display="none";
+  pendingLink=ctxNode.id;clearArmed();
+  const g=cv.querySelector(`g[data-id="${ctxNode.id}"]`);if(g)g.classList.add("armed");
+  msg("klik node tujuan untuk "+ctxNode.label);};
+document.getElementById("ctxDup").onclick=e=>{e.stopPropagation();ctxmenu.style.display="none";
+  addNode(ctxNode.type,ctxNode.x+30,ctxNode.y+30,ctxNode.label+" copy");};
+document.getElementById("ctxDel").onclick=e=>{e.stopPropagation();ctxmenu.style.display="none";
+  nodes=nodes.filter(x=>x.id!==ctxNode.id);delete nodesById[ctxNode.id];edges=edges.filter(x=>x.a!==ctxNode.id&&x.b!==ctxNode.id);sel=null;render();};
+function clearArmed(){cv.querySelectorAll("g.armed").forEach(g=>g.classList.remove("armed"));}
+function select(kind,id){sel={kind,id};if(!pendingLink)render();else renderInspector();}
+function startWire(){}
+// --- area: drag + resize ---
+function startAreaDrag(ev,a,g){
+  sel={kind:"area",id:a.id};renderInspector();
+  const sx=ev.clientX,sy=ev.clientY,ox=a.x,oy=a.y;
+  let moved=false,raf=0,px=ox,py=oy;
+  const apply=()=>{raf=0;a.x=px;a.y=py;
+    g.setAttribute("transform",`translate(${a.x.toFixed(1)},${a.y.toFixed(1)})`);};
+  const mv=e=>{if(Math.hypot(e.clientX-sx,e.clientY-sy)>4)moved=true;
+    if(!moved)return;
+    px=ox+(e.clientX-sx)/cam.z;py=oy+(e.clientY-sy)/cam.z;
+    if(!raf)raf=requestAnimationFrame(apply);};
+  const up=()=>{window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);
+    if(raf)cancelAnimationFrame(raf);
+    if(moved){pushUndo();a.x=px;a.y=py;render();}};
+  window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up);
+}
+function startResize(ev,a){
+  const sx=ev.clientX,sy=ev.clientY,ow=a.w,oh=a.h;
+  let raf=0;
+  const mv=e=>{
+    if(raf)return;
+    raf=requestAnimationFrame(()=>{raf=0;
+      a.w=Math.max(200,ow+(e.clientX-sx)/cam.z);
+      a.h=Math.max(120,oh+(e.clientY-sy)/cam.z);
+      render();});
+  };
+  const up=()=>{window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);
+    pushUndo();render();};
+  window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up);
+}
+let drag=null,edgeCache=[];
+function edgeD(a,b){
+  // tempel ke sisi terdekat: kanan/kiri/atas/bawah (bukan satu titik)
+  const W2=140,H2=56;
+  const ax=a.x+70,ay=a.y+28,bx=b.x+70,by=b.y+28;
+  const dx=bx-ax,dy=by-ay;
+  let x1,y1,x2,y2;
+  if(Math.abs(dx)>Math.abs(dy)*1.4){ // horizontal dominan
+    if(dx>0){x1=a.x+W2;y1=ay;x2=b.x;y2=by;}else{x1=a.x;y1=ay;x2=b.x+W2;y2=by;}
+  }else{ // vertikal dominan
+    if(dy>0){x1=ax;y1=a.y+H2;x2=bx;y2=b.y;}else{x1=ax;y1=a.y;x2=bx;y2=b.y+H2;}
+  }
+  const mx=(x1+x2)/2;
+  return {d:`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`,mx,my:(y1+y2)/2-6};}
+function startDrag(ev,n,g){
+  // jangan render di sini — g lagi dipegang, render bikin node basi & delay
+  sel={kind:"node",id:n.id};
+  cv.querySelectorAll("g.node.sel").forEach(x=>x.classList.remove("sel"));
+  g.classList.add("sel");
+  renderInspector();
+  document.getElementById("stN").textContent=nodes.length;
+  document.getElementById("stE").textContent=edges.length;
+  const sx=ev.clientX,sy=ev.clientY,ox=n.x,oy=n.y;
+  let moved=false,raf=0,px=ox,py=oy;
+  // cache path + label kabel yg nyambung node ini
+  const wired=[];
+  edges.forEach(ed=>{if(ed.a!==n.id&&ed.b!==n.id)return;
+    wired.push({ed,
+      p:cv.querySelector(`path[data-id="${ed.id}"]`),
+      t:cv.querySelector(`text[data-id="${ed.id}"]`)});});
+  const apply=()=>{
+    raf=0;
+    n.x=px;n.y=py;
+    g.setAttribute("transform",`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`);
+    for(const w of wired){
+      const a=nodesById[w.ed.a],b=nodesById[w.ed.b];if(!a||!b)continue;
+      const r=edgeD(a,b);
+      if(w.p)w.p.setAttribute("d",r.d);
+      if(w.t){w.t.setAttribute("x",r.mx);w.t.setAttribute("y",r.my);}
+    }};
+  const mv=e=>{if(Math.hypot(e.clientX-sx,e.clientY-sy)>4)moved=true;
+    if(!moved)return;
+    px=ox+(e.clientX-sx)/cam.z;py=oy+(e.clientY-sy)/cam.z;
+    if(!raf)raf=requestAnimationFrame(apply);};
+  const up=e=>{window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);
+    if(raf)cancelAnimationFrame(raf);
+    if(moved){pushUndo();n.x=px;n.y=py;render();}
+    else if(pendingLink){ // klik tanpa geser = pilih target link
+      if(pendingLink!==n.id){addEdge(pendingLink,n.id);pendingLink=null;clearArmed();msg("kabel nyambung ✓");}
+      else{pendingLink=null;clearArmed();render();}
+    }};
+  window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up);
+}
+cv.onclick=()=>{sel=null;render();};
+document.onkeydown=e=>{
+  if((e.key==="Delete"||e.key==="Backspace")&&sel&&document.activeElement.tagName!=="INPUT"){
+    if(sel.kind==="node"){delNode(sel.id);}
+    else if(sel.kind==="area"){pushUndo();areas=areas.filter(x=>x.id!==sel.id);}
+    else edges=edges.filter(x=>x.id!==sel.id);
+    sel=null;render();}
+};
+// inspector
+function renderInspector(){
+  const b=document.getElementById("inspBody");
+  if(!sel){b.innerHTML=`<p class="empty">Klik node atau edge untuk edit. Tekan Delete untuk hapus.</p>
+    <div class="f"><label>Import JSON</label><button id="bImp2" style="width:100%">Pilih file .json</button></div>
+    <div class="f"><label>Simpan lokal</label><button id="bSave" style="width:100%">Save ke browser</button></div>`;
+    const i2=document.getElementById("bImp2");if(i2)i2.onclick=()=>document.getElementById("fImport").click();
+    const sv=document.getElementById("bSave");if(sv)sv.onclick=save;
+    return;}
+  if(sel.kind==="node"){
+    const n=nodes.find(x=>x.id===sel.id);if(!n){sel=null;render();return;}
+    b.innerHTML=`<div class="f"><label>Label</label><input id="iL" value="${n.label}"></div>
+    <div class="f"><label>Sublabel</label><input id="iS" value="${n.sub||""}"></div>
+    <div class="f"><label>Tipe (warna Archify)</label><select id="iT">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===n.type?"selected":""}>${v.label}</option>`).join("")}</select></div>
+    <button id="iDel" style="width:100%;border-color:var(--rose);color:var(--rose)">Hapus node</button>`;
+    document.getElementById("iL").oninput=e=>{n.label=e.target.value;render();keepFocus("iL");};
+    document.getElementById("iS").oninput=e=>{n.sub=e.target.value;render();keepFocus("iS");};
+    document.getElementById("iL").onfocus=e=>e.target.dataset.v=e.target.value;
+    document.getElementById("iL").onblur=e=>{if(e.target.value!==e.target.dataset.v)pushUndo();};
+    document.getElementById("iS").onfocus=e=>e.target.dataset.v=e.target.value;
+    document.getElementById("iS").onblur=e=>{if(e.target.value!==e.target.dataset.v)pushUndo();};
+    document.getElementById("iT").onchange=e=>{pushUndo();n.type=e.target.value;render();};
+    document.getElementById("iDel").onclick=()=>delNode(n.id);
+  }else if(sel.kind==="area"){
+    const a=areas.find(x=>x.id===sel.id);if(!a){sel=null;render();return;}
+    const colors=[["Cyan","#22d3ee"],["Hijau","#34d399"],["Ungu","#a78bfa"],["Merah","#fb7185"],["Kuning","#fbbf24"],["Oranye","#fb923c"]];
+    b.innerHTML=`<div class="f"><label>Nama area</label><input id="iA" value="${a.label}"></div>
+    <div class="f"><label>Ukuran tulisan (<span id="iASV">${a.fs||13}px</span>)</label><input id="iAS" type="range" min="10" max="28" value="${a.fs||13}" style="padding:0"></div>
+    <div class="f"><label>Warna garis</label><select id="iAC">
+      ${colors.map(([nm,c])=>`<option value="${c}" ${c===a.color?"selected":""}>${nm}</option>`).join("")}</select></div>
+    <button id="iDel3" style="width:100%;border-color:var(--rose);color:var(--rose)">Hapus area</button>`;
+    document.getElementById("iA").oninput=e=>{a.label=e.target.value;render();keepFocus("iA");};
+    const slider=document.getElementById("iAS"),slbl=document.getElementById("iASV");
+    slider.oninput=e=>{a.fs=+e.target.value;slbl.textContent=a.fs+"px";
+      const t=cv.querySelector(`g[data-id="${a.id}"] text.h`);
+      if(t)t.setAttribute("font-size",a.fs);};
+    slider.onchange=()=>pushUndo();
+    document.getElementById("iAC").onchange=e=>{pushUndo();a.color=e.target.value;render();};
+    document.getElementById("iDel3").onclick=()=>{pushUndo();areas=areas.filter(x=>x.id!==a.id);sel=null;render();};
+  }else{
+    const e2=edges.find(x=>x.id===sel.id);if(!e2){sel=null;render();return;}
+    b.innerHTML=`<div class="f"><label>Label edge</label><input id="iE" value="${e2.label||""}"></div>
+    <button id="iDel2" style="width:100%;border-color:var(--rose);color:var(--rose)">Hapus edge</button>`;
+    document.getElementById("iE").oninput=e=>{e2.label=e.target.value;render();keepFocus("iE");};
+    document.getElementById("iDel2").onclick=()=>{edges=edges.filter(x=>x.id!==e2.id);sel=null;render();};
+  }
+}
+function keepFocus(id){const i=document.getElementById(id);if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}}
+// toolbar
+document.getElementById("bUndo").onclick=doUndo;
+document.getElementById("bRedo").onclick=doRedo;
+document.getElementById("bArea").onclick=()=>{
+  pushUndo();
+  const w=W()/cam.z,h=H()/cam.z;
+  const a={id:"a"+(areaSeq++),label:"Area "+(areaSeq-1),
+    x:cam.x+w/2-220,y:cam.y+h/2-140,w:440,h:280,color:"#22d3ee"};
+  areas.push(a);select("area",a.id);msg("area dibuat — tarik kotak kecil buat resize");};
+let flowOn=true;
+document.getElementById("bFlow").onclick=e=>{
+  flowOn=!flowOn;
+  render();
+  e.currentTarget.classList.toggle("on",flowOn);
+  msg(flowOn?"animasi nyala":"animasi mati");};
+// tema SB Admin 2 light
+if(localStorage.getItem("topo-theme")==="light")document.body.classList.add("light");
+document.getElementById("bTheme").onclick=e=>{
+  const light=document.body.classList.toggle("light");
+  localStorage.setItem("topo-theme",light?"light":"dark");
+  e.currentTarget.textContent=light?"🌙":"☀";
+  msg(light?"mode terang SB Admin 2":"mode gelap");
+};
+if(localStorage.getItem("topo-theme")==="light")document.getElementById("bTheme").textContent="🌙";
+// menu ⋯ + rename dokumen
+document.getElementById("bMore").onclick=e=>{e.stopPropagation();document.getElementById("menu").classList.toggle("open");};
+document.addEventListener("click",e=>{if(!e.target.closest(".menuwrap"))document.getElementById("menu").classList.remove("open");});
+let docTitle=localStorage.getItem("topo-title")||"Topologi Baru";
+document.getElementById("docTitle").textContent=docTitle;
+document.getElementById("docname").onclick=()=>{
+  const v=prompt("Nama dokumen:",docTitle);
+  if(v&&v.trim()){docTitle=v.trim();document.getElementById("docTitle").textContent=docTitle;localStorage.setItem("topo-title",docTitle);}
+};
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!e.shiftKey&&document.activeElement.tagName!=="INPUT"){e.preventDefault();doUndo();}
+  if(((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y")||((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==="z")){e.preventDefault();doRedo();}
+});
+document.getElementById("bClear").onclick=()=>{if(confirm("Hapus semua?"))resetAll();};
+document.getElementById("bMany").onclick=()=>{
+  pushUndo();
+  // jalur FO lengkap: Internet -> Router -> Switch -> OLT -> OTB -> Manhole -> ODC -> Manhole -> OTB -> ONT -> AP/Client
+  const mk=(t,x,y,l)=>{const n={id:"n"+(seq++),type:t,x,y,label:l,sub:TYPES[t].label.toLowerCase()};nodes.push(n);nodesById[n.id]=n;return n;};
+  const link=(a,b,l)=>edges.push({id:"e"+Date.now()+Math.floor(Math.random()*9999)+b.id,a:a.id,b:b.id,label:l||""});
+  const wan=mk("internet",300,60,"ISP-Uplink");
+  const rtr=mk("router",300,180,"Router-Edge");
+  const sw=mk("switch",300,300,"Core-SW1");
+  const olt=mk("olt",300,420,"OLT-01");
+  link(wan,rtr,"uplink");link(rtr,sw,"10G");link(sw,olt,"10G");
+  // 2 jalur distribusi: kiri via OTB, kanan via ODC
+  const otb1=mk("otb",180,540,"OTB-A1");
+  const mh1=mk("manhole",180,660,"MH-A1");
+  const odc=mk("odc",180,780,"ODC-01");
+  const mh2=mk("manhole",180,900,"MH-A2");
+  const otb2=mk("otb",180,1020,"OTB-A2");
+  link(olt,otb1,"feeder");link(otb1,mh1,"fo");link(mh1,odc,"fo");link(odc,mh2,"dist");link(mh2,otb2,"fo");
+  const otb3=mk("otb",480,540,"OTB-B1");
+  const mh3=mk("manhole",480,660,"MH-B1");
+  link(olt,otb3,"feeder");link(otb3,mh3,"fo");
+  // ODP + ONT + client di tiap ujung — 6 ODP x 4 ONT = 50+ node
+  let n=0;
+  [[otb2,1020],[mh3,660]].forEach(([src,yy],gi)=>{
+    for(let i=0;i<3;i++){
+      const xx=gi===0?60+i*200:380+i*200;
+      const odp=mk("odp",xx,yy+120,"ODP-"+(gi*3+i+1));
+      link(src,odp,i===0?"drop":"dist");
+      for(let k=0;k<4;k++){
+        n++;
+        const ont=mk("ont",xx-75+Math.floor(k/2)*150+(k%2)*75,yy+230,"ONT-"+n);
+        link(odp,ont,"drop");
+        const cl=mk(k%2?"client":"accesspoint",xx-75+Math.floor(k/2)*150+(k%2)*75,yy+340,k%2?"PC-"+n:"AP-"+n);
+        link(ont,cl,"eth0");
+      }
+    }
+  });
+  render();fitView();msg(nodes.length+" node jalur FO lengkap ✓");};
+document.getElementById("bLayout").onclick=()=>{
+  // layered layout: BFS dari node tanpa incoming -> kolom per depth
+  // reset kamera dulu biar objek yg nyasar jauh ketarik balik ke pandangan
+  cam={x:0,y:0,z:1};
+  if(!nodes.length){render();return;}
+  // layered layout ikut urutan jaringan FO global:
+  // internet(0) router(1) switch/firewall(2) olt(3) otb/odc(4) manhole(5) odp(6) ont(7) accesspoint/client(8)
+  const ORDER={internet:0,router:1,switch:2,firewall:2,olt:3,otb:4,odc:4,manhole:5,odp:6,ont:7,accesspoint:8,client:8};
+  const rank=n=>ORDER[n.type]??9;
+  // BFS dari root tapi hormati rank tipe: yg rank kecil selalu di kiri
+  const incoming={};nodes.forEach(n=>incoming[n.id]=0);
+  edges.forEach(e=>{if(incoming[e.b]!==undefined)incoming[e.b]++;});
+  const depth={};const q=[];
+  nodes.forEach(n=>{if(!incoming[n.id]){depth[n.id]=rank(n);q.push(n.id);}});
+  if(!q.length){nodes.forEach(n=>depth[n.id]=rank(n));q.push(...nodes.map(n=>n.id));}
+  const adj={};edges.forEach(e=>{(adj[e.a]=adj[e.a]||[]).push(e.b);});
+  const seen=new Set(q);
+  while(q.length){const id=q.shift();
+    const cur=depth[id];
+    (adj[id]||[]).forEach(t=>{
+      const want=Math.max(rank(nodesById[t]),cur+ (rank(nodesById[t])>cur?1:0));
+      if(!(t in depth)||depth[t]<want)depth[t]=want;
+      if(!seen.has(t)){seen.add(t);q.push(t);}});}
+  nodes.forEach(n=>{if(!(n.id in depth))depth[n.id]=rank(n);});
+  const cols={};nodes.forEach(n=>{(cols[depth[n.id]]=cols[depth[n.id]]||[]).push(n);});
+  // dalam tiap baris urutkan: manhole/odp/ont berderet horizontal, client paling kanan
+  Object.values(cols).forEach(list=>list.sort((a,b)=>rank(a)-rank(b)||a.label.localeCompare(b.label)));
+  Object.entries(cols).forEach(([d,list])=>{
+    list.forEach((n,i)=>{n.x=60+i*200;n.y=60+ +d*120;});});
+  // pastikan DOM sudah update sebelum ukur layar
+  requestAnimationFrame(()=>{fitView();msg("layout rapi — semua kelihatan ✓");});};
+document.getElementById("bJson").onclick=()=>{
+  const blob=new Blob([JSON.stringify({nodes,edges,areas,areaSeq},null,2)],{type:"application/json"});
+  dl(URL.createObjectURL(blob),"topologi-archify.json");};
+document.getElementById("bSvg").onclick=()=>{
+  const s=new XMLSerializer().serializeToString(cv);
+  dl(URL.createObjectURL(new Blob([s],{type:"image/svg+xml"})),"topologi-archify.svg");};
+document.getElementById("bPng").onclick=()=>{
+  const s=new XMLSerializer().serializeToString(cv);
+  const img=new Image();
+  img.onload=()=>{const c=document.createElement("canvas");c.width=W()*2;c.height=H()*2;
+    const x=c.getContext("2d");x.fillStyle="#070b1a";x.fillRect(0,0,c.width,c.height);x.scale(2,2);x.drawImage(img,0,0);
+    c.toBlob(b=>dl(URL.createObjectURL(b),"topologi-archify.png"));};
+  img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s);};
+function dl(url,name){const a=document.createElement("a");a.href=url;a.download=name;a.click();}
+function save(){localStorage.setItem("topo-archify",JSON.stringify({nodes,edges,areas,areaSeq}));msg("tersimpan di browser ✓");}
+document.getElementById("fImport").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);loadData(d);msg("import ok");}catch{msg("file JSON invalid");}};r.readAsText(f);};
+function loadSample(){
+  resetAll();seq=1;
+  // jalur default vertikal: Internet (atas) -> ... -> Client (bawah)
+  const wan=addNode("internet",300,60,"ISP","uplink"),rtr=addNode("router",300,180,"Router","gateway"),
+        sw=addNode("switch",300,300,"Core-SW","10G"),olt=addNode("olt",300,420,"OLT-01","pon"),
+        otb1=addNode("otb",300,540,"OTB-1","feeder"),mh1=addNode("manhole",300,660,"MH-1","fo"),
+        odc=addNode("odc",300,780,"ODC-01","dist"),mh2=addNode("manhole",300,900,"MH-2","fo"),
+        otb2=addNode("otb",300,1020,"OTB-2","fo"),odp=addNode("odp",300,1140,"ODP-01","drop"),
+        ont=addNode("ont",300,1260,"ONT-01","drop"),ap=addNode("accesspoint",180,1380,"AP-01","wifi"),
+        cl=addNode("client",420,1380,"PC-01","eth0");
+  addEdge(wan.id,rtr.id,"uplink");addEdge(rtr.id,sw.id,"10G");addEdge(sw.id,olt.id,"10G");
+  addEdge(olt.id,otb1.id,"feeder");addEdge(otb1.id,mh1.id,"fo");addEdge(mh1.id,odc.id,"fo");
+  addEdge(odc.id,mh2.id,"dist");addEdge(mh2.id,otb2.id,"fo");addEdge(otb2.id,odp.id,"drop");
+  addEdge(odp.id,ont.id,"drop");addEdge(ont.id,ap.id,"eth0");addEdge(ont.id,cl.id,"eth0");
+  fitView();msg("jalur FO lengkap dimuat ✓");}
+// restore
+try{const d=JSON.parse(localStorage.getItem("topo-archify")||"null");if(d&&d.nodes&&d.nodes.length)loadData(d);else loadSample();}catch{loadSample();}
+window.onresize=applyCam;
+render();
+</script>
+</body>
+</html>

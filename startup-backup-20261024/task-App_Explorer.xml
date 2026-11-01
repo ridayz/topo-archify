@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Author>App Explorer</Author>
+    <URI>\App Explorer</URI>
+  </RegistrationInfo>
+  <Principals>
+    <Principal id="Principal1">
+      <GroupId>S-1-5-32-545</GroupId>
+    </Principal>
+  </Principals>
+  <Settings>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <IdleSettings>
+      <Duration>PT10M</Duration>
+      <WaitTimeout>PT1H</WaitTimeout>
+      <StopOnIdleEnd>true</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+  </Settings>
+  <Triggers>
+    <LogonTrigger id="TriggerLogOn">
+      <Delay>PT2M</Delay>
+    </LogonTrigger>
+  </Triggers>
+  <Actions Context="Principal1">
+    <Exec>
+      <Command>%LOCALAPPDATA%\Host App Service\Engine\HostAppServiceUpdater.exe</Command>
+      <Arguments>/LOGON</Arguments>
+    </Exec>
+  </Actions>
+</Task>

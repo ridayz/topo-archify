@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNA Helix Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a0f;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Geist', 'Manrope', 'Poppins', sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+        .controls button {
+            background: #181818;
+            border: 1px solid #313131;
+            color: #e8e8e8;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .controls button:hover {
+            background: #272727;
+            border-color: #00ff88;
+            color: #00ff88;
+        }
+        .controls button.active {
+            background: #00ff88;
+            border-color: #00ff88;
+            color: #0a0a0f;
+        }
+        .info {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            color: #888;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .info strong {
+            color: #00ff88;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="info">
+        <strong>DNA Helix</strong><br>
+        Geometric strands with animated rotation<br>
+        Base pairs: A-T / C-G cycling
+    </div>
+    <div class="controls">
+        <button id="btnPause" onclick="togglePause()">Pause</button>
+        <button id="btnSpeed" onclick="cycleSpeed()">Speed: 1x</button>
+        <button onclick="toggleShapes()">Shapes: On</button>
+        <button onclick="toggleParticles()">Particles: On</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height, centerX, centerY;
+        let animationId = null;
+        let paused = false;
+        let speedMultiplier = 1;
+        let showShapes = true;
+        let showParticles = true;
+        
+        // Configuration
+        const CONFIG = {
+            helixRadius: 120,
+            helixHeight: 300,
+            numTurns: 3,
+            basePairsPerTurn: 10,
+            rotationSpeed: 0.008,
+            strandColors: ['#00ff88', '#00ccff'],
+            basePairs: [
+                ['#00ff88', '#ff0066'],  // A-T
+                ['#00ccff', '#ffaa00'],  // C-G
+                ['#ff0066', '#00ff88'],  // T-A
+                ['#ffaa00', '#00ccff'],  // G-C
+            ],
+            particleColors: ['#00ff88', '#00ccff', '#ff0066', '#ffaa00', '#aa00ff', '#ffffff'],
+            shapes: ['hexagon', 'triangle', 'square', 'pentagon', 'octagon', 'diamond', 'star'],
+        };
+        
+        let angle = 0;
+        let particles = [];
+        const totalBases = CONFIG.numTurns * CONFIG.basePairsPerTurn;
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width * devicePixelRatio;
+            canvas.height = height * devicePixelRatio;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            ctx.scale(devicePixelRatio, devicePixelRatio);
+            centerX = width / 2;
+            centerY = height / 2;
+        }
+        
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < 30; i++) {
+                particles.push({
+                    angle: i * (Math.PI * 2 / 30),
+                    radius: 150 + (i % 3) * 30,
+                    height: (i % 10) * 30 - 150,
+                    speed: 0.01 + (i % 5) * 0.005,
+                    size: 2 + (i % 4),
+                    color: CONFIG.particleColors[i % CONFIG.particleColors.length],
+                    phase: i * 0.5
+                });
+            }
+        }
+        
+        function drawPolygon(x, y, radius, sides, rotation, color, fill = true) {
+            ctx.beginPath();
+            for (let i = 0; i < sides; i++) {
+                const a = rotation + (i * Math.PI * 2 / sides) - Math.PI / 2;
+                const px = x + Math.cos(a) * radius;
+                const py = y + Math.sin(a) * radius;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            if (fill) {
+                ctx.fillStyle = color;
+                ctx.fill();
+            } else {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+        
+        function drawStar(x, y, radius, rotation, color) {
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const a = rotation + (i * Math.PI * 2 / 5) - Math.PI / 2;
+                const px = x + Math.cos(a) * radius;
+                const py = y + Math.sin(a) * radius;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+                
+                const aInner = rotation + ((i + 0.5) * Math.PI * 2 / 5) - Math.PI / 2;
+                const pxInner = x + Math.cos(aInner) * radius * 0.4;
+                const pyInner = y + Math.sin(aInner) * radius * 0.4;
+                ctx.lineTo(pxInner, pyInner);
+            }
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+        
+        function drawShape(x, y, size, shapeType, rotation, color) {
+            switch (shapeType) {
+                case 'hexagon': drawPolygon(x, y, size, 6, rotation, color); break;
+                case 'triangle': drawPolygon(x, y, size * 1.2, 3, rotation, color); break;
+                case 'square': drawPolygon(x, y, size, 4, rotation, color); break;
+                case 'pentagon': drawPolygon(x, y, size, 5, rotation, color); break;
+                case 'octagon': drawPolygon(x, y, size * 0.7, 8, rotation, color); break;
+                case 'diamond': drawPolygon(x, y, size, 4, rotation + Math.PI/4, color); break;
+                case 'star': drawStar(x, y, size, rotation, color); break;
+            }
+        }
+        
+        function hexToRgb(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return { r, g, b };
+        }
+        
+        function adjustColor(hex, factor) {
+            const { r, g, b } = hexToRgb(hex);
+            return `rgb(${Math.round(r * factor)}, ${Math.round(g * factor)}, ${Math.round(b * factor)})`;
+        }
+        
+        function drawHelixStrand(phaseOffset, colorIndex) {
+            const color = CONFIG.strandColors[colorIndex];
+            const strandShapes = ['pentagon', 'hexagon', 'octagon', 'diamond'];
+            
+            for (let i = 0; i < totalBases * 2; i++) {
+                const t = i / (totalBases * 2) * CONFIG.numTurns * Math.PI * 2;
+                const radius = CONFIG.helixRadius * (0.9 + 0.1 * Math.sin(t * 2 + angle));
+                
+                const x = radius * Math.cos(t + phaseOffset + angle);
+                const y = (i / (totalBases * 2) - 0.5) * CONFIG.helixHeight;
+                const zRot = (t + phaseOffset + angle) * 180 / Math.PI;
+                
+                // Perspective projection
+                const perspective = 1 / (1 + (radius * Math.sin(t + phaseOffset + angle)) / 500);
+                const xProj = x * perspective + centerX;
+                const yProj = y * perspective + centerY;
+                const sizeProj = Math.max(3, 8 * perspective);
+                
+                const shapeType = strandShapes[i % strandShapes.length];
+                const pulse = 0.5 + 0.5 * Math.sin(angle * 3 + i * 0.5);
+                const sizeFinal = sizeProj * (0.8 + 0.4 * pulse);
+                const colorVaried = adjustColor(color, 0.7 + 0.3 * pulse);
+                
+                if (showShapes) {
+                    drawShape(xProj, yProj, sizeFinal, shapeType, zRot * Math.PI / 180, colorVaried);
+                }
+            }
+        }
+        
+        function drawBasePairs() {
+            for (let i = 0; i < totalBases; i++) {
+                const t = i / totalBases * CONFIG.numTurns * Math.PI * 2;
+                const radius = CONFIG.helixRadius;
+                
+                const x1 = radius * Math.cos(t + angle);
+                const y1 = (i / totalBases - 0.5) * CONFIG.helixHeight;
+                const x2 = radius * Math.cos(t + Math.PI + angle);
+                const y2 = y1;
+                
+                const perspective1 = 1 / (1 + (radius * Math.sin(t + angle)) / 500);
+                const perspective2 = 1 / (1 + (radius * Math.sin(t + Math.PI + angle)) / 500);
+                
+                const x1p = x1 * perspective1 + centerX;
+                const y1p = y1 * perspective1 + centerY;
+                const x2p = x2 * perspective2 + centerX;
+                const y2p = y2 * perspective2 + centerY;
+                
+                const [color1, color2] = CONFIG.basePairs[i % CONFIG.basePairs.length];
+                const pulse = 0.5 + 0.5 * Math.sin(angle * 4 + i * 0.8);
+                const rotation = (t + angle);
+                
+                // Draw connecting line (hydrogen bonds)
+                ctx.beginPath();
+                ctx.moveTo(x1p, y1p);
+                ctx.lineTo(x2p, y2p);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + pulse * 0.15})`;
+                ctx.lineWidth = 1 + pulse * 2;
+                ctx.stroke();
+                
+                // Draw geometric shapes at ends
+                const size = 8 + pulse * 4;
+                if (showShapes) {
+                    drawShape(x1p, y1p, size, 'hexagon', rotation, color1);
+                    drawShape(x2p, y2p, size, 'hexagon', rotation + Math.PI, color2);
+                    // Inner shapes
+                    drawShape(x1p, y1p, size * 0.5, 'triangle', rotation + 0.5, '#ffffff');
+                    drawShape(x2p, y2p, size * 0.5, 'triangle', rotation + Math.PI + 0.5, '#ffffff');
+                }
+            }
+        }
+        
+        function drawGlowRings() {
+            ctx.lineWidth = 1;
+            for (let ring = 0; ring < 3; ring++) {
+                const radius = CONFIG.helixRadius * (1.1 + ring * 0.15);
+                const glowColors = ['#00ff88', '#00ccff', '#ff0066'];
+                const color = glowColors[ring];
+                const alpha = 0.08 + 0.12 * Math.sin(angle * 2 + ring);
+                const r = radius * (1 + 0.05 * Math.sin(angle * 1.5 + ring));
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = alpha;
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+        }
+        
+        function updateParticles() {
+            for (const p of particles) {
+                p.angle += p.speed * speedMultiplier;
+                p.phase += 0.02 * speedMultiplier;
+                
+                const x = p.radius * Math.cos(p.angle + angle * 0.5);
+                const y = p.height + 20 * Math.sin(p.phase);
+                
+                const perspective = 1 / (1 + (p.radius * Math.sin(p.angle)) / 500);
+                const xProj = x * perspective + centerX;
+                const yProj = y * perspective + centerY;
+                const sizeProj = Math.max(1, p.size * perspective);
+                
+                // Draw particle dot
+                ctx.beginPath();
+                ctx.arc(xProj, yProj, sizeProj, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(p.phase * 2));
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                
+                // Occasional geometric shape
+                if (showShapes && Math.floor(p.phase * 10) % 20 < 5) {
+                    drawShape(xProj, yProj, sizeProj * 0.8, 'triangle', p.phase * 50, p.color);
+                }
+            }
+        }
+        
+        function frame() {
+            if (paused) {
+                animationId = requestAnimationFrame(frame);
+                return;
+            }
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw glow rings (backmost)
+            drawGlowRings();
+            
+            // Draw strands
+            drawHelixStrand(0, 0);      // Strand 1
+            drawHelixStrand(Math.PI, 1); // Strand 2
+            
+            // Draw base pairs
+            drawBasePairs();
+            
+            // Draw particles
+            if (showParticles) {
+                updateParticles();
+            }
+            
+            // Update angle
+            angle += CONFIG.rotationSpeed * speedMultiplier;
+            
+            animationId = requestAnimationFrame(frame);
+        }
+        
+        function togglePause() {
+            paused = !paused;
+            document.getElementById('btnPause').textContent = paused ? 'Resume' : 'Pause';
+            document.getElementById('btnPause').classList.toggle('active', paused);
+        }
+        
+        function cycleSpeed() {
+            const speeds = [0.5, 1, 2, 3];
+            const currentIndex = speeds.indexOf(speedMultiplier);
+            speedMultiplier = speeds[(currentIndex + 1) % speeds.length];
+            document.getElementById('btnSpeed').textContent = `Speed: ${speedMultiplier}x`;
+        }
+        
+        function toggleShapes() {
+            showShapes = !showShapes;
+            const btn = event.target;
+            btn.textContent = `Shapes: ${showShapes ? 'On' : 'Off'}`;
+            btn.classList.toggle('active', !showShapes);
+        }
+        
+        function toggleParticles() {
+            showParticles = !showParticles;
+            const btn = event.target;
+            btn.textContent = `Particles: ${showParticles ? 'On' : 'Off'}`;
+            btn.classList.toggle('active', !showParticles);
+        }
+        
+        // Initialize
+        window.addEventListener('resize', resize);
+        resize();
+        initParticles();
+        frame();
+        
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                cancelAnimationFrame(animationId);
+            } else {
+                frame();
+            }
+        });
+    </script>
+</body>
+</html>

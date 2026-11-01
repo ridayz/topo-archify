@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Topo Archify 3D</title>
+<style>
+:root{--bg:#070b1a;--line:rgba(255,255,255,.09);--txt:#e8ecf5;--mut:#8b94ad;--cyan:#22d3ee;--mono:"JetBrains Mono",Consolas,monospace;--sans:"Plus Jakarta Sans",system-ui,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:#0b1226;z-index:10}
+.logo{font-family:var(--mono);font-weight:800;font-size:15px}.logo b{color:var(--cyan)}
+.crumb{font-family:var(--mono);font-size:11px;color:var(--mut)}
+.hbtns{margin-left:auto;display:flex;gap:8px}
+button{font-family:var(--mono);font-size:12px;background:#0e1630;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--cyan)}button:active{transform:scale(.96)}
+button.primary{background:linear-gradient(135deg,#0075ff,#00e0ff);border:none;font-weight:700}
+#main{flex:1;display:flex;min-height:0}
+#palette{width:196px;border-right:1px solid var(--line);background:#0b1226;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+#palette h3{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase}
+.shape{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#101a36;font-size:13px;cursor:grab}
+.shape:hover{border-color:var(--cyan)}
+.shape .ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-weight:800;font-size:13px;flex:none}
+#stage{flex:1;position:relative;min-width:0}
+#cv3d{width:100%;height:100%;display:block}
+#insp{width:240px;border-left:1px solid var(--line);background:#0b1226;padding:14px;overflow:auto}
+#insp h3{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin-bottom:10px}
+.f{margin-bottom:10px}.f label{display:block;font-family:var(--mono);font-size:11px;color:var(--mut);margin-bottom:4px}
+.f input,.f select{width:100%;background:#0e1630;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px;font-family:var(--mono);font-size:12px}
+.empty{color:var(--mut);font-size:13px;line-height:1.6}
+#legend{position:absolute;left:12px;bottom:12px;display:flex;gap:10px;background:rgba(11,18,38,.9);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--mut)}
+#legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}
+footer{display:flex;gap:16px;padding:7px 16px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--mut);background:#0b1226}
+footer b{color:#34d399}
+#tip{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(11,18,38,.9);border:1px solid var(--line);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:11px;color:var(--mut);pointer-events:none}
+@media(max-width:900px){#palette{display:none}#insp{width:200px}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<header>
+<div class="logo">◈ TOPO<b>ARCHIFY</b> 3D</div>
+<div class="crumb">evidence console / three.js</div>
+<div class="hbtns">
+<button id="bClear">Clear</button>
+<button id="bJson">Export JSON</button>
+<button class="primary" id="bSample">Load sample</button>
+</div>
+</header>
+<div id="main">
+<aside id="palette"><h3>Nodes — klik untuk tambah</h3><div id="shapes"></div>
+<h3 style="margin-top:8px">Mode</h3>
+<button id="bLink">🔗 Mode link: OFF</button>
+<p class="empty">Klik node A lalu node B saat mode link ON. Drag node untuk pindah (geser di bidang). Scroll = zoom, klik-kanan-drag = pan.</p></aside>
+<div id="stage"><canvas id="cv3d"></canvas><div id="tip">drag node = pindah · scroll = zoom · klik = inspect</div>
+<div id="legend"><span><i style="background:#22d3ee"></i>frontend</span><span><i style="background:#34d399"></i>backend</span><span><i style="background:#a78bfa"></i>database</span><span><i style="background:#fb7185"></i>security</span></div></div>
+<aside id="insp"><h3>Inspector</h3><div id="inspBody"><p class="empty">Klik node atau edge untuk edit. Tekan Delete untuk hapus.</p></div></aside>
+</div>
+<footer><span>nodes: <b id="stN">0</b></span><span>edges: <b id="stE">0</b></span><span id="stMsg">ready</span></footer>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const TYPES={frontend:{label:"Frontend",c:0x22d3ee,css:"#22d3ee"},backend:{label:"Backend",c:0x34d399,css:"#34d399"},database:{label:"Database",c:0xa78bfa,css:"#a78bfa"},security:{label:"Security",c:0xfb7185,css:"#fb7185"},cloud:{label:"Cloud",c:0xfbbf24,css:"#fbbf24"},transit:{label:"Transit",c:0xfb923c,css:"#fb923c"}};
+let nodes=[],edges=[],seq=1,sel=null,linkMode=false,linkFrom=null;
+const canvas=document.getElementById("cv3d"),stage=document.getElementById("stage");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x070b1a);
+scene.add(new THREE.AmbientLight(0xffffff,.9));
+const dl=new THREE.DirectionalLight(0xffffff,1.2);dl.position.set(5,8,6);scene.add(dl);
+const camera=new THREE.PerspectiveCamera(50,1,.1,500);camera.position.set(0,7,14);
+const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.08;
+// grid Archify blueprint
+const grid=new THREE.GridHelper(40,40,0x1e2a4a,0x141d38);grid.position.y=-1.2;scene.add(grid);
+const nodeGroup=new THREE.Group(),edgeGroup=new THREE.Group(),labelGroup=new THREE.Group();
+scene.add(nodeGroup,edgeGroup,labelGroup);
+const boxGeo=new THREE.BoxGeometry(2.4,1.1,.6);
+const edgeMatBase={transparent:true,opacity:.85};
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+window.addEventListener("resize",resize);resize();
+// palette
+const sh=document.getElementById("shapes");
+Object.entries(TYPES).forEach(([k,v])=>{const d=document.createElement("div");d.className="shape";
+d.innerHTML=`<span class="ic" style="background:${v.css}22;color:${v.css};border:1px solid ${v.css}55">◆</span>${v.label}`;
+d.onclick=()=>addNode(k,(Math.random()-.5)*10,0,(Math.random()-.5)*6);sh.appendChild(d);});
+function msg(t){document.getElementById("stMsg").textContent=t;}
+function makeLabel(text){const c=document.createElement("canvas");c.width=256;c.height=64;const x=c.getContext("2d");
+x.fillStyle="#e8ecf5";x.font="bold 26px monospace";x.textAlign="center";x.fillText(text.slice(0,16),128,30);
+x.fillStyle="#8b94ad";x.font="20px monospace";x.fillText("",128,54);
+const t=new THREE.CanvasTexture(c);const m=new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false});
+const s=new THREE.Sprite(m);s.scale.set(2.4,.6,1);return s;}
+function addNode(type,x=0,z=0,label){const n={id:"n"+(seq++),type,x,z,label:label||TYPES[type].label+" "+(seq-1)};
+const mat=new THREE.MeshStandardMaterial({color:TYPES[type].c,roughness:.35,metalness:.5,emissive:TYPES[type].c,emissiveIntensity:.25});
+const m=new THREE.Mesh(boxGeo,mat);m.position.set(n.x,0,n.z);m.userData.nid=n.id;nodeGroup.add(m);n.mesh=m;
+const lb=makeLabel(n.label);lb.position.set(n.x,1.1,n.z);labelGroup.add(lb);n.labelSpr=lb;
+nodes.push(n);render();return n;}
+function addEdge(a,b,label){edges.push({id:"e"+Date.now()+Math.floor(Math.random()*99),a,b,label:label||""});render();}
+function edgePoints(a,b){return [new THREE.Vector3(a.x,0,a.z),new THREE.Vector3((a.x+b.x)/2,1.2,(a.z+b.z)/2),new THREE.Vector3(b.x,0,b.z)];}
+function render(){
+// edges
+while(edgeGroup.children.length){const o=edgeGroup.children.pop();o.geometry?.dispose();o.material?.dispose();}
+edges.forEach(e=>{const a=nodes.find(n=>n.id===e.a),b=nodes.find(n=>n.id===e.b);if(!a||!b)return;
+const curve=new THREE.QuadraticBezierCurve3(new THREE.Vector3(a.x,0,a.z),new THREE.Vector3((a.x+b.x)/2,1.4,(a.z+b.z)/2),new THREE.Vector3(b.x,0,b.z));
+const g=new THREE.TubeGeometry(curve,20,.035,6,false);
+const m=new THREE.MeshBasicMaterial({color:TYPES[a.type].c,...edgeMatBase});
+const tube=new THREE.Mesh(g,m);tube.userData.eid=e.id;edgeGroup.add(tube);e.mesh=tube;});
+// selection ring
+nodes.forEach(n=>{const isSel=sel&&sel.id===n.id;
+n.mesh.material.emissiveIntensity=isSel?0.9:0.25;
+n.mesh.scale.set(isSel?1.12:1,isSel?1.12:1,1);});
+document.getElementById("stN").textContent=nodes.length;
+document.getElementById("stE").textContent=edges.length;
+renderInspector();}
+function select(kind,id){sel={kind,id};render();}
+// picking
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();let dragN=null,dragMoved=false;
+function pick(e){const r=canvas.getBoundingClientRect();ptr.x=((e.clientX-r.left)/r.width)*2-1;ptr.y=-((e.clientY-r.top)/r.height)*2+1;
+ray.setFromCamera(ptr,camera);
+const hits=ray.intersectObjects([...nodeGroup.children,...edgeGroup.children]);
+return hits[0]?.object||null;}
+canvas.addEventListener("pointerdown",e=>{if(e.button!==0)return;const o=pick(e);
+if(o&&o.userData.nid){dragN=nodes.find(n=>n.id===o.userData.nid);dragMoved=false;controls.enabled=false;}});
+canvas.addEventListener("pointermove",e=>{if(!dragN)return;dragMoved=true;
+const r=canvas.getBoundingClientRect();ptr.x=((e.clientX-r.left)/r.width)*2-1;ptr.y=-((e.clientY-r.top)/r.height)*2+1;
+ray.setFromCamera(ptr,camera);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+const pt=new THREE.Vector3();ray.ray.intersectPlane(plane,pt);
+dragN.x=THREE.MathUtils.clamp(pt.x,-18,18);dragN.z=THREE.MathUtils.clamp(pt.z,-18,18);
+dragN.mesh.position.set(dragN.x,0,dragN.z);dragN.labelSpr.position.set(dragN.x,1.1,dragN.z);
+// live update kabel
+edges.forEach(ed=>{if(ed.a!==dragN.id&&ed.b!==dragN.id)return;const a=nodes.find(n=>n.id===ed.a),b=nodes.find(n=>n.id===ed.b);
+if(!a||!b||!ed.mesh)return;const curve=new THREE.QuadraticBezierCurve3(new THREE.Vector3(a.x,0,a.z),new THREE.Vector3((a.x+b.x)/2,1.4,(a.z+b.z)/2),new THREE.Vector3(b.x,0,b.z));
+ed.mesh.geometry.dispose();ed.mesh.geometry=new THREE.TubeGeometry(curve,20,.035,6,false);});});
+canvas.addEventListener("pointerup",e=>{controls.enabled=true;
+if(dragN&&!dragMoved){const n=dragN;
+if(linkMode){if(!linkFrom){linkFrom=n;msg("link dari "+n.label+" — klik target");}else if(linkFrom.id!==n.id){addEdge(linkFrom.id,n.id);linkFrom=null;msg("edge dibuat");}}
+else select("node",n.id);}
+else if(dragN){render();}
+dragN=null;});
+canvas.addEventListener("click",e=>{if(dragMoved)return;const o=pick(e);
+if(o&&o.userData.eid)select("edge",o.userData.eid);});
+document.addEventListener("keydown",e=>{if((e.key==="Delete"||e.key==="Backspace")&&sel&&document.activeElement.tagName!=="INPUT"){
+if(sel.kind==="node"){const id=sel.id;const n=nodes.find(x=>x.id===id);
+if(n){nodeGroup.remove(n.mesh);n.mesh.material.dispose();labelGroup.remove(n.labelSpr);n.labelSpr.material.map.dispose();n.labelSpr.material.dispose();}
+nodes=nodes.filter(x=>x.id!==id);edges=edges.filter(x=>x.a!==id&&x.b!==id);}
+else edges=edges.filter(x=>x.id!==sel.id);sel=null;render();}});
+// inspector
+function renderInspector(){const b=document.getElementById("inspBody");
+if(!sel){b.innerHTML=`<p class="empty">Klik node/edge 3D untuk edit. Delete = hapus.</p>`;return;}
+if(sel.kind==="node"){const n=nodes.find(x=>x.id===sel.id);if(!n){sel=null;render();return;}
+b.innerHTML=`<div class="f"><label>Label</label><input id="iL" value="${n.label}"></div>
+<div class="f"><label>Tipe</label><select id="iT">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===n.type?"selected":""}>${v.label}</option>`).join("")}</select></div>
+<button id="iDel" style="width:100%;border-color:#fb7185;color:#fb7185">Hapus node</button>`;
+document.getElementById("iL").oninput=e=>{n.label=e.target.value;labelGroup.remove(n.labelSpr);n.labelSpr=makeLabel(n.label||"?");n.labelSpr.position.set(n.x,1.1,n.z);labelGroup.add(n.labelSpr);};
+document.getElementById("iT").onchange=e=>{n.type=e.target.value;n.mesh.material.color.set(TYPES[n.type].c);n.mesh.material.emissive.set(TYPES[n.type].c);render();};
+document.getElementById("iDel").onclick=()=>{nodeGroup.remove(n.mesh);labelGroup.remove(n.labelSpr);nodes=nodes.filter(x=>x.id!==n.id);edges=edges.filter(x=>x.a!==n.id&&x.b!==n.id);sel=null;render();};}
+else{const e2=edges.find(x=>x.id===sel.id);if(!e2){sel=null;render();return;}
+b.innerHTML=`<div class="f"><label>Label edge</label><input id="iE" value="${e2.label||""}"></div>
+<button id="iDel2" style="width:100%;border-color:#fb7185;color:#fb7185">Hapus edge</button>`;
+document.getElementById("iE").oninput=e=>{e2.label=e.target.value;};
+document.getElementById("iDel2").onclick=()=>{edges=edges.filter(x=>x.id!==e2.id);sel=null;render();};}}
+// toolbar
+document.getElementById("bLink").onclick=e=>{linkMode=!linkMode;linkFrom=null;e.target.textContent=`🔗 Mode link: ${linkMode?"ON":"OFF"}`;};
+document.getElementById("bClear").onclick=()=>{if(confirm("Hapus semua?")){nodes.forEach(n=>{n.mesh.material.dispose();});nodes=[];edges=[];sel=null;render();}};
+document.getElementById("bJson").onclick=()=>{const blob=new Blob([JSON.stringify({nodes:nodes.map(({id,type,x,z,label})=>({id,type,x,z,label})),edges},null,2)],{type:"application/json"});
+const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="topologi-3d.json";a.click();};
+document.getElementById("bSample").onclick=()=>{nodes.forEach(n=>n.mesh.material.dispose());nodes=[];edges=[];seq=1;
+const a=addNode("frontend",-6,0,"Web App"),b=addNode("backend",0,0,"API"),c=addNode("database",6,0,"Postgres"),
+d=addNode("security",0,-5,"WAF"),e2=addNode("cloud",-6,-5,"CDN");
+addEdge(a.id,b.id,"https");addEdge(b.id,c.id,"query");addEdge(e2.id,a.id,"cache");addEdge(d.id,b.id,"guard");
+msg("sample 3D dimuat");};
+// loop + reduced motion + pause saat hidden
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let running=true;document.addEventListener("visibilitychange",()=>{running=!document.hidden;});
+if(reduced){renderer.render(scene,camera);}
+else{renderer.setAnimationLoop(()=>{if(!running)return;controls.update();
+// pulse halus di edge terpilih
+const t=performance.now()*.002;
+edges.forEach(e2=>{if(e2.mesh)e2.mesh.material.opacity=(sel&&sel.id===e2.id)?.5+Math.abs(Math.sin(t))*.5:.85;});
+renderer.render(scene,camera);});}
+document.getElementById("bSample").click();
+</script>
+</body>
+</html>

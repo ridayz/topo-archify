@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magic DNA Helix</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070714;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Manrope,Poppins,sans-serif;color:#fff;overflow:hidden}
+h1{font-size:clamp(20px,4vw,36px);margin-bottom:8px;text-wrap:balance}
+p{opacity:.7;margin-bottom:24px}
+.helix{display:flex;flex-direction:column;gap:14px;animation:bob 4s ease-in-out infinite}
+.row{display:flex;align-items:center;gap:18px;animation:spinRow 6s linear infinite;transform-style:preserve-3d}
+@keyframes spinRow{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.shape{width:28px;height:28px;animation:rot 6s linear infinite}
+@keyframes rot{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hexagon{background:#22d3ee;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
+.diamond{background:#f472b6;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.triangle{background:#a78bfa;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.star{background:#facc15;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.rung{width:70px;height:2px;background:linear-gradient(90deg,#22d3ee,#f472b6);border-radius:2px}
+code{background:#1F1F1F;padding:12px 16px;border-radius:12px;margin-top:28px;font-size:13px;color:#a5f3fc}
+</style>
+</head>
+<body>
+<h1>Magic DNA Helix</h1>
+<p>Repeating geometric shapes + animated rotation</p>
+<div class="helix" id="helix"></div>
+<code>python magic-dna-helix-turtle.py</code>
+<script>
+const helix=document.getElementById('helix');
+const shapes=['hexagon','diamond','triangle','star'];
+for(let i=0;i<14;i++){
+  const row=document.createElement('div');
+  row.className='row';
+  row.style.animationDelay=(i*-0.43)+'s';
+  const hue=(i*24)%360;
+  row.innerHTML=`<div class="shape ${shapes[i%4]}" style="filter:hue-rotate(${hue}deg);animation-delay:${i*-0.4}s"></div><div class="rung"></div><div class="shape ${shapes[(i+2)%4]}" style="filter:hue-rotate(${hue+140}deg);animation-delay:${i*-0.4}s"></div>`;
+  helix.appendChild(row);
+}
+</script>
+</body>
+</html>

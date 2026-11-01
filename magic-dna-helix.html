@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magic DNA Helix</title>
+<meta name="description" content="An animated DNA helix built from repeating geometric shapes, rotating in three dimensions.">
+<meta property="og:title" content="Magic DNA Helix">
+<meta property="og:description" content="Repeating geometric shapes rotating on a double helix.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><polygon points='16,2 30,16 16,30 2,16' fill='%2322d3ee'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #181818;
+    --surface-2: #1F1F1F;
+    --line: #313131;
+    --text: #F5F5F5;
+    --muted: #A3A3A3;
+    --cyan: #22D3EE;
+    --violet: #A78BFA;
+    --pink: #F472B6;
+    --amber: #FACC15;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Manrope, Poppins, system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 32px 16px;
+    overflow: hidden;
+    text-wrap: pretty;
+  }
+
+  .skip {
+    position: absolute;
+    left: -9999px;
+    top: 16px;
+    padding: 8px 16px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    color: var(--text);
+  }
+  .skip:focus { left: 16px; z-index: 10; }
+
+  header { text-align: center; max-width: 46ch; }
+
+  h1 {
+    font-size: clamp(24px, 4vw, 40px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  header p {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ---------------- Helix stage ---------------- */
+  .stage {
+    position: relative;
+    width: min(320px, 82vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 0;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: #0B0B0B;
+  }
+
+  .helix {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* One base pair = two shapes joined by a rung, rotated in 3D */
+  .pair {
+    position: relative;
+    width: 100%;
+    height: 26px;
+  }
+
+  .pair .arm {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 26px;
+    height: 26px;
+    will-change: transform, opacity;
+  }
+
+  /* JS writes translate(x, -50%) plus a per-strand depth scale, so the two
+     strands trace opposite sides of the helix circle. */
+
+  .shape {
+    display: block;
+    width: 26px;
+    height: 26px;
+    background: var(--c, var(--cyan));
+  }
+
+  .shape.hexagon  { clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+  .shape.diamond  { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .shape.triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .shape.star     { clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+
+  /* The rung connects the two strands. The strands sit at the horizontal
+     offsets R*cos(angle) and -R*cos(angle), so the bar spans 2R*cos(angle)
+     and foreshortens to zero when the pair is edge-on. */
+  .rung {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    height: 2px;
+    background: var(--c, var(--cyan));
+    border-radius: 2px;
+    will-change: transform, opacity;
+  }
+
+  /* ---------------- Controls ---------------- */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  button {
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: transform 150ms ease-out, background-color 150ms ease-out,
+                border-color 150ms ease-out;
+  }
+
+  button:hover { background: #272727; border-color: #4A4A4A; }
+  button:active { transform: scale(0.96); }
+
+  :focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+    border-radius: 12px;
+  }
+
+  .hint {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    color: #A5F3FC;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 16px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .helix { animation: none; }
+    .shape, .rung { transition: none; }
+    button { transition: background-color 150ms ease-out; }
+    button:active { transform: none; }
+  }
+
+  @media (max-width: 480px) {
+    .stage { padding: 16px 20px; }
+    .shape { width: 22px; height: 22px; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#helix-stage">Skip to helix</a>
+
+<header>
+  <h1>Magic DNA Helix</h1>
+  <p>A double helix built from repeating geometric shapes, turning on two axes. The rungs compress as each base pair passes behind the strand.</p>
+</header>
+
+<main class="stage" id="helix-stage" aria-label="Animated DNA helix">
+  <div class="helix" id="helix" role="img"
+       aria-label="Rotating DNA double helix made of hexagons, diamonds, triangles and stars"></div>
+</main>
+
+<div class="controls">
+  <button type="button" id="toggle" aria-pressed="false">Pause rotation</button>
+  <button type="button" id="shapes">Cycle shapes</button>
+  <button type="button" id="speed">Speed x1</button>
+</div>
+<p class="hint">Geometry only, no images. Respects reduced-motion preferences.</p>
+<code>python magic_dna_helix.py</code>
+
+<script>
+(function () {
+  var helix = document.getElementById('helix');
+  var PAIRS = 14;
+  var SHAPES = ['hexagon', 'diamond', 'triangle', 'star'];
+  var COLORS = ['#22D3EE', '#A78BFA', '#F472B6', '#FACC15'];
+  var TURNS = 2.25;                    // full rotations along the strand
+  var RADIUS = 74;                     // helix radius in px
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var pairs = [];
+
+  // Build the helix once. Per-frame work only touches transforms, opacity
+  // and filter, so the layout is never recalculated.
+  for (var i = 0; i < PAIRS; i++) {
+    var f = i / (PAIRS - 1);
+    var pair = document.createElement('div');
+    pair.className = 'pair';
+
+    var shapeA = document.createElement('span');
+    shapeA.className = 'shape ' + SHAPES[i % SHAPES.length];
+    shapeA.style.background = COLORS[i % COLORS.length];
+
+    var shapeB = document.createElement('span');
+    shapeB.className = 'shape ' + SHAPES[(i + 2) % SHAPES.length];
+    shapeB.style.background = COLORS[(i + 2) % COLORS.length];
+
+    var armA = document.createElement('div');
+    armA.className = 'arm a';
+    armA.appendChild(shapeA);
+
+    var armB = document.createElement('div');
+    armB.className = 'arm b';
+    armB.appendChild(shapeB);
+
+    var rung = document.createElement('div');
+    rung.className = 'rung';
+    rung.style.background = COLORS[i % COLORS.length];
+
+    pair.appendChild(rung);
+    pair.appendChild(armA);
+    pair.appendChild(armB);
+    helix.appendChild(pair);
+
+    pairs.push({
+      shapeA: shapeA, shapeB: shapeB, armA: armA, armB: armB,
+      rung: rung, base: (f * TURNS * 360) % 360,
+    });
+  }
+
+  // ---- Animation loop -----------------------------------------------------
+  var DEG_PER_SEC = 42;                // degrees of phase per second at x1
+  var last = 0;
+  var speedMul = 1;
+  var running = !reduce;
+  var phase = 0;
+
+  function frame(now) {
+    if (!running) return;
+    if (!last) last = now;
+    var dt = Math.min(now - last, 64); // clamp after tab switches
+    last = now;
+    phase = (phase + DEG_PER_SEC * speedMul * dt / 1000) % 360;
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function render() {
+    for (var i = 0; i < pairs.length; i++) {
+      var p = pairs[i];
+      var rad = (phase + p.base) * Math.PI / 180;
+
+      var x = RADIUS * Math.sin(rad);        // horizontal offset
+      var z = RADIUS * Math.cos(rad);        // + = toward the viewer
+      var depth = (z + RADIUS) / (2 * RADIUS);   // 0 = back, 1 = front
+      var scale = 0.62 + depth * 0.38;
+
+      // Strand A is at +x / +z, strand B at the antipode.
+      place(p.armA, p.shapeA, x, z, scale, depth);
+      place(p.armB, p.shapeB, -x, -z, scale, 1 - depth);
+
+      // Rung spans the two strands (-x to +x), so it stays centred and
+      // foreshortens to zero when the pair is edge on.
+      var span = Math.max(2, Math.abs(x) * 2);
+      p.rung.style.transform = 'translate(-50%, -50%)';
+      p.rung.style.width = span.toFixed(2) + 'px';
+      p.rung.style.opacity = (0.12 + Math.abs(x) / RADIUS * 0.4).toFixed(3);
+    }
+  }
+
+  function place(arm, shape, x, z, scale, depth) {
+    // Nearer shapes are larger and brighter; far ones shrink and dim.
+    var brightness = 0.55 + depth * 0.45;
+    arm.style.transform =
+      'translate(-50%, -50%) translateX(' + x.toFixed(2) + 'px) scale(' +
+      scale.toFixed(3) + ')';
+    arm.style.zIndex = String(Math.round(depth * 100));
+    shape.style.opacity = (0.35 + depth * 0.65).toFixed(3);
+    shape.style.filter = 'brightness(' + brightness.toFixed(3) + ')';
+  }
+
+  // Paint the first frame immediately so nothing is blank.
+  render();
+  if (running) requestAnimationFrame(frame);
+
+  // ---- Controls -----------------------------------------------------------
+  var toggleBtn = document.getElementById('toggle');
+  var shapesBtn = document.getElementById('shapes');
+  var speedBtn = document.getElementById('speed');
+
+  toggleBtn.addEventListener('click', function () {
+    running = !running;
+    toggleBtn.setAttribute('aria-pressed', String(!running));
+    toggleBtn.textContent = running ? 'Pause rotation' : 'Resume rotation';
+    if (running) { last = 0; requestAnimationFrame(frame); }
+  });
+
+  var shapeIndex = 0;
+  shapesBtn.addEventListener('click', function () {
+    shapeIndex++;
+    for (var i = 0; i < pairs.length; i++) {
+      var a = SHAPES[(i + shapeIndex) % SHAPES.length];
+      var b = SHAPES[(i + 2 + shapeIndex) % SHAPES.length];
+      pairs[i].shapeA.className = 'shape ' + a;
+      pairs[i].shapeB.className = 'shape ' + b;
+    }
+  });
+
+  var speeds = [1, 1.75, 0.5];
+  var speedIndex = 0;
+  speedBtn.addEventListener('click', function () {
+    speedIndex = (speedIndex + 1) % speeds.length;
+    speedMul = speeds[speedIndex];
+    speedBtn.textContent = 'Speed x' + speedMul;
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === ' ') { e.preventDefault(); toggleBtn.click(); }
+  });
+})();
+</script>
+</body>
+</html>
